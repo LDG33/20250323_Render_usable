@@ -1,31 +1,40 @@
 from flask import Flask, g, request, redirect, render_template, session, url_for
-import sqlite3
+#import sqlite3
+import psycopg2
+import os
 
 app = Flask(__name__)
 
 #session and database details
 app.secret_key = 'qwertyuiop123'
-db_location = 'var/QuizAppDatabase.db'
+#probably not needed anymore if I changed SQLite into PostGreSQL Render.com database (today 20250328)
+#db_location = 'var/QuizAppDatabase.db'
 
 #python root
 @app.route("/")
 def intro():
         return render_template('index.html')
 
+#connection to database <- OLD VERSION !!!!!! (today 20250328)
+#def get_db():
+    #db = getattr(g, 'db', None)
+    #if db is None:
+        #db = sqlite3.connect(db_location)
+        #g.db = db
+    #return db
+
 #connection to database
 def get_db():
-    db = getattr(g, 'db', None)
-    if db is None:
-        db = sqlite3.connect(db_location)
-        g.db = db
+    db_url = os.environ.get("DATABASE_URL")
+    db = psycopg2.connect(db_url)
     return db
 
-#database closure
-@app.teardown_appcontext
-def close_db_connection(exception):
-    db = getattr(g, 'db', None)
-    if db is not None:
-        db.close()
+#database closure <- OLD VERSION !!!!!! (today 20250328)
+#@app.teardown_appcontext
+#def close_db_connection(exception):
+#    db = getattr(g, 'db', None)
+#    if db is not None:
+#        db.close()
 
 #login route
 @app.route("/login", methods=['GET', 'POST'])

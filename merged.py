@@ -2,13 +2,19 @@ from flask import Flask, g, request, redirect, render_template, session, url_for
 #import sqlite3
 import psycopg2
 import os
+from dotenv import load_dotenv
 
 app = Flask(__name__)
 
 #session and database details
 app.secret_key = 'qwertyuiop123'
+
 #probably not needed anymore if I changed SQLite into PostGreSQL Render.com database (today 20250328)
 #db_location = 'var/QuizAppDatabase.db'
+#I take it form dotenv library  <---   DATABASE_URL = "postgresql://quizapp_database_20250326_user:LG8hXL1GFY3xv4k9Dc87L6rxiB5YRtRO@dpg-cvi3685ds78s73ej15i0-a.oregon-postgres.render.com/quizapp_database_20250326"
+
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 #python root
 @app.route("/")
@@ -24,10 +30,20 @@ def intro():
     #return db
 
 #connection to database
+#db_url = os.getenv("DATABASE_URL") <--alternative code to os.environ.get
 def get_db():
-    db_url = os.environ.get("DATABASE_URL")
-    db = psycopg2.connect(db_url)
-    return db
+    try:
+        #db_url = os.environ.get("DATABASE_URL")
+        #if not db_url:
+            #raise ValueError("not set or empty")
+    
+        #db = psycopg2.connect(db_url)
+        db = psycopg2.connect(DATABASE_URL)
+        
+        return db
+    except Exception as e:
+        print(f"Error connecting to db: {e}")
+        return None
 
 #database closure <- OLD VERSION !!!!!! (today 20250328)
 #@app.teardown_appcontext
@@ -54,8 +70,15 @@ def login():
         user = request.form['username']
         pw = request.form['password']
 
-        sql = "SELECT * FROM Users WHERE Username = ? AND Password = ?"
-        cursor.execute(sql, (user,pw))
+        #default:
+        #sql = "SELECT * FROM Users WHERE Username = ? AND Password = ?"
+        #cursor.execute(sql, (user,pw))
+        #altered:
+        #sql = 'SELECT * FROM Users WHERE Username = '+user+' AND Password = '+pw+''
+        #cursor.execute(sql)
+        #sql = "SELECT * FROM Users WHERE username = %s AND password = %s"
+        #cursor.execute(sql, (user,pw))
+        cursor.execute("SELECT * FROM Users WHERE username = %s AND password = %s", (user,pw))
 
         rows = cursor.fetchall()
         for row in rows:
@@ -67,6 +90,13 @@ def login():
             return render_template('login.html', message='Sorry No Input, Type Again: ')
         elif (usernameFromDB == user)or(passwordFromDB == pw):
             session['logged']=True
+            #previously in route /quiz which was redirected elsewhere so the sessions did not exist
+            # ... which caused an error KeyError "negative" or "score"
+            session['score']=0
+            session['negative']=0
+            session['q1']=0
+            session['q2']=0
+            session['q3']=0
             return render_template('quiz.html', message='Correct You are logged in! ')
             #later redirect to quiz
             
@@ -92,7 +122,10 @@ def register():
             return render_template('register.html', messageReg='You have left empty fields')
 
         if(pw1==pw2):
-            db.cursor().execute('INSERT INTO Users (Username, Password) VALUES (?, ?)',(userReg,pw2))
+            #db.cursor().execute('INSERT INTO Users (Username, Password) VALUES (?, ?)',(userReg,pw2))
+            #db.cursor().execute('INSERT INTO users (Username, Password) VALUES (?, ?)',(userReg,pw2))
+            #db.cursor().execute('INSERT INTO users (username, password) VALUES ('+userReg+', '+pw2+')')
+            db.cursor().execute('INSERT INTO users (username, password) VALUES (%s, %s)',(userReg, pw2))
             db.commit()
             #no need for session? 
             return render_template('login.html', message='New account has been registerd')
@@ -106,12 +139,14 @@ def register():
 #all the subsequent routes to handle each quiz URL 
 @app.route("/quiz")
 def hello():
+    #session.clear()
     session['score']=0
     session['negative']=0
     session['q1']=0
     session['q2']=0
     session['q3']=0
-    return render_template('quiz.html')
+    print(session['negative'])
+    #return render_template('quiz.html')
 
 @app.route("/q1/")
 def q1():
